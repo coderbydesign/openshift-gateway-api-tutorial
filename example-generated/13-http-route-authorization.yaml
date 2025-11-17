@@ -1,0 +1,23 @@
+---
+# HTTPRoute-specific Authorization Policy - Additional org_id validation
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: demo-http-route-authz
+  namespace: echo-services
+  labels:
+    app.kubernetes.io/name: demo-http-route-authz
+    app.kubernetes.io/part-of: demo-gateway-poc
+spec:
+  # Target the HTTP echo service specifically
+  selector:
+    matchLabels:
+      app: http-echo
+
+  action: ALLOW
+
+  rules:
+  # Additional rule: Allow if org_id claim equals "12345"
+  - when:
+    - key: request.auth.claims[org_id]
+      values: ["12345"]

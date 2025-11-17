@@ -1,0 +1,48 @@
+---
+# Global Gateway Policy - ALL routes need scope validation
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: demo-gateway-global-authz
+  namespace: demo-gateway-poc
+  labels:
+    app.kubernetes.io/name: demo-gateway-global-authz
+    app.kubernetes.io/part-of: demo-gateway-poc
+spec:
+  # Target the Gateway deployment
+  selector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: demo-e2w-gateway
+
+  action: ALLOW
+
+  rules:
+  # Global rule: Allow if scope contains "api.console"
+  - when:
+    - key: request.auth.claims[scope]
+      values: ["*api.console*"]  # Contains match
+
+---
+# Deny policy to enforce authentication requirement
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: demo-gateway-deny-unauthenticated
+  namespace: demo-gateway-poc
+  labels:
+    app.kubernetes.io/name: demo-gateway-deny-unauthenticated
+    app.kubernetes.io/part-of: demo-gateway-poc
+spec:
+  # Target the Gateway deployment
+  selector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: demo-e2w-gateway
+
+  # Deny requests without valid JWT
+  action: DENY
+
+  rules:
+  # Deny when no JWT is present (no request.auth.principal)
+  - when:
+    - key: request.auth.principal
+      notValues: ["*"]

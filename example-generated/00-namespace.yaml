@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo-gateway-poc
+  labels:
+    app.kubernetes.io/name: demo-gateway-poc
+    app.kubernetes.io/component: gateway-mesh
+    app.kubernetes.io/part-of: service-mesh-poc

@@ -1,0 +1,30 @@
+---
+apiVersion: security.istio.io/v1beta1
+kind: RequestAuthentication
+metadata:
+  name: demo-gateway-jwt
+  namespace: demo-gateway-poc
+  labels:
+    app.kubernetes.io/name: demo-gateway-jwt
+    app.kubernetes.io/part-of: demo-gateway-poc
+spec:
+  # Target the Gateway deployment
+  selector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: demo-e2w-gateway
+
+  jwtRules:
+  - issuer: "https://sso.redhat.com/auth/realms/redhat-external"
+    jwksUri: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/certs"
+
+    # Extract JWT from Authorization header
+    fromHeaders:
+    - name: "Authorization"
+      prefix: "Bearer "
+
+    # Also allow JWT in query parameter (for testing)
+    fromParams:
+    - "jwt"
+
+    # Forward the original JWT to backend services
+    forwardOriginalToken: true

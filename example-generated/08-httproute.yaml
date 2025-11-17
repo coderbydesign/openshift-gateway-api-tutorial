@@ -1,0 +1,59 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-echo-route
+  namespace: echo-services
+  labels:
+    app.kubernetes.io/name: http-echo-route
+    app.kubernetes.io/part-of: demo-gateway-poc
+spec:
+  # Reference the Gateway in demo-gateway-poc namespace
+  parentRefs:
+  - name: demo-e2w-gateway
+    namespace: demo-gateway-poc
+    sectionName: https  # Use HTTPS listener
+
+  # Match requests to our hostname
+  hostnames:
+  - demo-gateway-poc.apps.your-cluster.example.com
+
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /http
+    backendRefs:
+    - name: http-echo
+      port: 80
+      weight: 100
+
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: http-echo-route-plain
+  namespace: echo-services
+  labels:
+    app.kubernetes.io/name: http-echo-route-plain
+    app.kubernetes.io/part-of: demo-gateway-poc
+spec:
+  # Also create route for plain HTTP (port 80)
+  parentRefs:
+  - name: demo-e2w-gateway
+    namespace: demo-gateway-poc
+    sectionName: http  # Use HTTP listener
+
+  # Match requests to our hostname
+  hostnames:
+  - demo-gateway-poc.apps.your-cluster.example.com
+
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /http
+    backendRefs:
+    - name: http-echo
+      port: 80
+      weight: 100

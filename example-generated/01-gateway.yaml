@@ -1,0 +1,60 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: demo-e2w-gateway
+  namespace: demo-gateway-poc
+  annotations:
+    cert-manager.io/cluster-issuer: demo-gateway-poc-issuer
+spec:
+  gatewayClassName: openshift-default
+  listeners:
+  # HTTP listener (for cert validation and redirects)
+  - name: http
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            app.kubernetes.io/part-of: demo-gateway-poc
+      kinds:
+        - kind: HTTPRoute
+
+  # HTTPS listener for HTTP traffic
+  - name: https
+    port: 443
+    protocol: HTTPS
+    hostname: demo-gateway-poc.apps.your-cluster.example.com
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: demo-gateway-poc-cert
+        kind: Secret
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            app.kubernetes.io/part-of: demo-gateway-poc
+      kinds:
+        - kind: HTTPRoute
+
+  # gRPC over TLS listener
+  - name: grpc-tls
+    port: 8443
+    protocol: HTTPS
+    hostname: demo-gateway-poc.apps.your-cluster.example.com
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: demo-gateway-poc-cert
+        kind: Secret
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            app.kubernetes.io/part-of: demo-gateway-poc
+      kinds:
+        - kind: GRPCRoute

@@ -1,0 +1,23 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: demo-gateway-poc-cert
+  namespace: demo-gateway-poc
+spec:
+  # Secret name that will contain the TLS certificate
+  secretName: demo-gateway-poc-cert
+
+  # Reference to our dedicated ClusterIssuer
+  issuerRef:
+    name: demo-gateway-poc-issuer
+    kind: ClusterIssuer
+
+  # Domain name for the certificate
+  dnsNames:
+  - demo-gateway-poc.apps.your-cluster.example.com
+
+  # Certificate usage
+  usages:
+  - digital signature
+  - key encipherment

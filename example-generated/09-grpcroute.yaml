@@ -1,0 +1,36 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GRPCRoute
+metadata:
+  name: grpc-echo-route
+  namespace: echo-services
+  labels:
+    app.kubernetes.io/name: grpc-echo-route
+    app.kubernetes.io/part-of: demo-gateway-poc
+spec:
+  # Reference the Gateway's gRPC-TLS listener
+  parentRefs:
+  - name: demo-e2w-gateway
+    namespace: demo-gateway-poc
+    sectionName: https  # Use HTTPS listener (port 443) - Gateway can handle both HTTP and gRPC
+
+  # Match requests to our hostname
+  hostnames:
+  - demo-gateway-poc.apps.your-cluster.example.com
+
+  rules:
+  # Health check service route
+  - matches:
+    - method:
+        service: grpc.health.v1.Health
+        method: Check
+    backendRefs:
+    - name: grpc-echo
+      port: 9090
+      weight: 100
+
+  # Catch-all for other gRPC traffic
+  - backendRefs:
+    - name: grpc-echo
+      port: 9090
+      weight: 100
