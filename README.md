@@ -18,8 +18,9 @@ By the end of this tutorial, you'll have a production-ready Gateway API implemen
 For detailed architectural diagrams, traffic flow explanations, and design patterns, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 Key architectural highlights:
+- **Direct LoadBalancer access** for CDN integration and custom domains
 - **Single Gateway port (443)** handling both HTTP and gRPC protocols
-- **TLS termination** at Gateway edge with Let's Encrypt certificates
+- **TLS termination** at Gateway edge with automated certificate management
 - **JWT authentication** with configurable token issuers
 - **Layered authorization** policies with claims-based validation
 - **Cross-namespace routing** with proper security isolation
@@ -61,7 +62,7 @@ oc get pods -n cert-manager
 ### 1. Clone and Prepare Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/coderbydesign/openshift-gateway-api-tutorial
 cd openshift-gateway-api-tutorial
 
 # Review the example implementation
@@ -145,15 +146,14 @@ generated/
 │   ├── 01-gateway.yaml            # Gateway with your hostname
 │   ├── 02-clusterissuer.yaml      # CA issuer configuration
 │   ├── 03-certificate.yaml       # TLS certificate for your domain
-│   ├── 04-route.yaml              # OpenShift Route configuration
-│   ├── 05-echo-services-namespace.yaml  # Services namespace
-│   ├── 06-http-echo-deployment.yaml     # HTTP echo service
-│   ├── 07-grpc-echo-deployment.yaml     # gRPC echo service
-│   ├── 08-httproute.yaml               # HTTP routing rules
-│   ├── 09-grpcroute.yaml               # gRPC routing rules
-│   ├── 11-authentication-policy.yaml   # JWT authentication
-│   ├── 12-authorization-policy.yaml    # Global authorization
-│   └── 13-http-route-authorization.yaml # Service-specific authorization
+│   ├── 04-echo-services-namespace.yaml  # Services namespace
+│   ├── 05-http-echo-deployment.yaml     # HTTP echo service
+│   ├── 06-grpc-echo-deployment.yaml     # gRPC echo service
+│   ├── 07-httproute.yaml               # HTTP routing rules
+│   ├── 08-grpcroute.yaml               # gRPC routing rules
+│   ├── 09-authentication-policy.yaml   # JWT authentication
+│   ├── 10-authorization-policy.yaml    # Global authorization
+│   └── 11-http-route-authorization.yaml # Service-specific authorization
 ├── test-guide.md               # Customized testing instructions
 ├── cleanup.sh                  # Environment-specific cleanup script
 └── deploy.sh                   # Automated deployment script
@@ -172,7 +172,7 @@ The interactive tutorial follows this progression:
 ### Phase 2: Infrastructure Deployment
 - Create namespaces and basic Gateway resources
 - Set up TLS certificate automation
-- Configure external access via OpenShift Routes
+- Configure direct LoadBalancer access for external clients
 - Verify basic Gateway functionality
 
 ### Phase 3: Service Implementation
@@ -202,6 +202,252 @@ This repository includes comprehensive reference materials:
 - **[TEST-GUIDE.md](TEST-GUIDE.md)**: Comprehensive testing scenarios and examples
 - **[example-generated/](example-generated/)**: Complete example implementation showing tutorial output
 - **[cleanup.sh](cleanup.sh)**: Safe resource cleanup script
+
+## 🔗 Production Integration: Akamai CDN Setup
+
+This tutorial's direct LoadBalancer architecture is designed for seamless CDN integration. Here's how to configure TLS and certificates for Akamai deployment:
+
+### TLS Architecture with Akamai
+
+```
+Internet → [TLS 1] → Akamai → [TLS 2] → LoadBalancer → Gateway → Services
+```
+
+**Two certificate layers**:
+1. **Public TLS (Internet → Akamai)**: Customer's domain certificate
+2. **Origin TLS (Akamai → Gateway)**: Origin server certificate
+
+### Certificate Configuration
+
+#### 1. Public Certificate (Akamai Edge)
+
+**Option A: Akamai Managed**
+```bash
+# Akamai automatically provisions Let's Encrypt certificates
+# for your custom domain (api.yourcompany.com)
+# No manual configuration needed
+```
+
+**Option B: Custom Certificate**
+```bash
+# Upload your own certificate to Akamai
+# Supports EV certificates, wildcard certs, etc.
+```
+
+#### 2. Origin Certificate (Akamai → Gateway)
+
+**Option A: Self-Signed (Recommended)**
+```yaml
+# Create self-signed issuer for origin certificates
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: origin-ca-issuer
+  namespace: demo-gateway-poc
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: origin-certificate
+  namespace: demo-gateway-poc
+spec:
+  secretName: origin-certificate
+  issuerRef:
+    name: origin-ca-issuer
+  dnsNames:
+  - "*.yourcompany.com"  # Wildcard for flexibility
+  - "api.yourcompany.com"
+  - "gateway.yourcompany.com"
+```
+
+**Option B: Internal CA**
+```yaml
+# Use your organization's internal CA
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: company-ca-issuer
+spec:
+  ca:
+    secretName: company-ca-key-pair
+```
+
+**Option C: Public CA (Less Common)**
+```yaml
+# Use Let's Encrypt for origin (requires DNS validation)
+# Note: HTTP-01 validation won't work behind Akamai
+apiVersion: cert-manager.io/v1
+kind: Certificate
+spec:
+  acme:
+    solvers:
+    - dns01:
+        route53: # or other DNS provider
+          region: us-east-1
+          accessKeyID: AKIAI...
+```
+
+### Akamai Origin Configuration
+
+#### Property Configuration
+```json
+{
+  "origin": {
+    "hostname": "a1b2c3d4-12345678.us-east-1.elb.amazonaws.com",
+    "port": 443,
+    "protocol": "HTTPS"
+  },
+  "forwardHostHeader": "INCOMING",  // Send custom domain in Host header
+  "originCertVerification": "CUSTOM",
+  "customCertificateAuthorities": ["...origin-ca-cert..."]
+}
+```
+
+#### Host Header Forwarding
+```javascript
+// Akamai Edge Rule to forward correct Host header
+if (request.url.startsWith("/api/")) {
+  setOriginHeader("Host", "api.yourcompany.com");
+}
+```
+
+### DNS Configuration
+
+#### CNAME Setup
+```dns
+# Point your API domain to Akamai edge
+api.yourcompany.com CNAME api.yourcompany.com.edgesuite.net
+
+# Or direct to LoadBalancer for testing
+test-gateway.yourcompany.com CNAME a1b2c3d4-12345678.us-east-1.elb.amazonaws.com
+```
+
+### Update Gateway Configuration
+
+#### Update Certificate Reference
+```yaml
+# Update 01-gateway.yaml to use origin certificate
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: demo-e2w-gateway
+spec:
+  listeners:
+  - name: https
+    port: 443
+    protocol: HTTPS
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: origin-certificate  # Use origin cert instead of Let's Encrypt
+```
+
+#### Update Certificate Resource
+```yaml
+# Update 03-certificate.yaml for your domain
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: origin-certificate
+spec:
+  secretName: origin-certificate
+  issuerRef:
+    name: origin-ca-issuer  # Use origin issuer
+  dnsNames:
+  - "api.yourcompany.com"
+  - "*.yourcompany.com"
+```
+
+### Testing Production Setup
+
+#### 1. Test Origin Directly
+```bash
+# Test LoadBalancer with origin certificate
+curl -k https://a1b2c3d4-12345678.us-east-1.elb.amazonaws.com/http \
+  -H "Host: api.yourcompany.com"
+```
+
+#### 2. Test Through Akamai
+```bash
+# Test full CDN flow
+curl https://api.yourcompany.com/http
+```
+
+#### 3. Validate Certificate Chain
+```bash
+# Check Akamai edge certificate
+openssl s_client -connect api.yourcompany.com:443 -servername api.yourcompany.com
+
+# Check origin certificate (from inside Akamai network)
+openssl s_client -connect $LOADBALANCER_HOSTNAME:443 -servername api.yourcompany.com
+```
+
+### Security Considerations
+
+#### Origin Protection
+```yaml
+# Restrict Gateway access to Akamai IP ranges only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: akamai-only-access
+spec:
+  podSelector:
+    matchLabels:
+      app: gateway
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 23.0.0.0/8    # Akamai IP range example
+    - ipBlock:
+        cidr: 104.64.0.0/10 # Add all Akamai ranges
+```
+
+#### Certificate Rotation
+```yaml
+# Automate origin certificate renewal
+apiVersion: cert-manager.io/v1
+kind: Certificate
+spec:
+  renewBefore: 720h  # 30 days before expiry
+  duration: 8760h    # 1 year validity
+```
+
+### Monitoring and Alerting
+
+#### Certificate Expiry Monitoring
+```yaml
+# Example ServiceMonitor for cert-manager metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cert-manager-metrics
+spec:
+  selector:
+    matchLabels:
+      app: cert-manager
+  endpoints:
+  - port: tcp-prometheus-servicemonitor
+```
+
+#### Akamai Health Checks
+```json
+{
+  "healthCheck": {
+    "path": "/health",
+    "protocol": "HTTPS",
+    "port": 443,
+    "interval": 30,
+    "timeout": 10,
+    "healthyThreshold": 2,
+    "unhealthyThreshold": 3
+  }
+}
+```
 
 ## 🔍 Example Use Cases
 

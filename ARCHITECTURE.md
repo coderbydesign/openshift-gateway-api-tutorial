@@ -4,12 +4,12 @@ This document provides a comprehensive architectural overview of the OpenShift S
 
 ## 🏗️ Traffic Flow Architecture
 
-The following diagram shows how external requests flow through the OpenShift infrastructure to reach backend services via the Gateway API:
+The following diagram shows how external requests flow directly to the Gateway API via LoadBalancer, ideal for CDN and custom domain setups:
 
 ```mermaid
 graph TD
-    A[External Client] -->|HTTPS Request| B[OpenShift Route]
-    B -->|TLS Passthrough| C[Gateway:443 HTTPS Listener]
+    A[External Client / CDN] -->|HTTPS Request| B[LoadBalancer Service]
+    B -->|Direct Connection| C[Gateway:443 HTTPS Listener]
 
     C --> D{Protocol Detection}
     D -->|HTTP/1.1| E[HTTPRoute]
@@ -33,8 +33,8 @@ graph TD
 
 ### Traffic Flow Explanation
 
-1. **External Client** makes HTTPS requests to the cluster hostname
-2. **OpenShift Route** receives the request and performs TLS passthrough
+1. **External Client or CDN** makes HTTPS requests directly to LoadBalancer endpoint
+2. **LoadBalancer Service** forwards traffic directly to Gateway pods
 3. **Gateway** (port 443) terminates TLS and handles protocol detection
 4. **Protocol Detection** routes traffic based on HTTP version:
    - HTTP/1.1 requests → HTTPRoute
@@ -49,14 +49,14 @@ This sequence diagram illustrates the complete JWT authentication and claims-bas
 ```mermaid
 sequenceDiagram
     participant Client
-    participant Route as OpenShift Route
+    participant LB as LoadBalancer
     participant GW as Gateway
     participant Auth as Istio Auth
     participant HTTP as HTTP Service
     participant gRPC as gRPC Service
 
-    Client->>Route: HTTPS Request + JWT
-    Route->>GW: TLS Passthrough
+    Client->>LB: HTTPS Request + JWT
+    LB->>GW: Direct TLS Connection
 
     GW->>Auth: JWT Validation
     Auth->>Auth: Check issuer (sso.redhat.com)
@@ -108,14 +108,16 @@ sequenceDiagram
 - Creates LoadBalancer services automatically
 - Integrates with OpenShift's native networking
 
-**External Access Pattern**:
-- OpenShift Route required for hostname → LoadBalancer mapping
-- `termination: passthrough` preserves Gateway TLS termination
-- Single external hostname for all protocols
+**Direct LoadBalancer Access**:
+- External clients connect directly to LoadBalancer endpoint
+- No OpenShift Route required (simpler architecture)
+- Perfect for CDN integration (Akamai, CloudFlare, etc.)
+- Custom domain CNAMEs point directly to LoadBalancer
 
 **Protocol Handling**:
 - Single Gateway listener handles multiple protocols via detection
 - HTTP/1.1 and HTTP/2 automatically differentiated
+- No hostname restrictions allow flexible domain configuration
 - Routes attach to listeners by `sectionName` reference
 
 ### Security Architecture
@@ -346,6 +348,67 @@ oc get virtualservice -o yaml
 oc get destinationrule -o yaml
 ```
 
+## 🔄 Architecture Evolution: Direct LoadBalancer Pattern
+
+### Migration from Route-based Architecture
+
+This implementation originally used an OpenShift Route in front of the Gateway but was migrated to **direct LoadBalancer access** for improved performance and CDN integration.
+
+#### Previous Pattern (Route-based)
+```
+External Client → OpenShift Route → LoadBalancer → Gateway → Services
+```
+
+**Issues addressed**:
+- Dual TLS termination (Route + Gateway)
+- Additional network hop reducing performance
+- OpenShift Route management complexity
+- Less suitable for CDN integration patterns
+
+#### Current Pattern (Direct LoadBalancer)
+```
+External Client/CDN → LoadBalancer → Gateway → Services
+```
+
+**Benefits achieved**:
+- Single TLS termination at Gateway edge
+- Simplified traffic flow with fewer components
+- CDN-friendly architecture (Akamai, CloudFlare, etc.)
+- Standard origin server pattern
+
+### Migration Validation
+
+The architectural change was validated by testing both patterns with identical results:
+
+```bash
+# Route-based access
+curl -s https://gateway.apps.cluster.example.com/http
+# Result: RBAC: access denied
+
+# Direct LoadBalancer access
+curl -sk https://[loadbalancer-hostname]/http -H "Host: gateway.apps.cluster.example.com"
+# Result: RBAC: access denied (identical behavior)
+```
+
+### Production Migration Steps
+
+For existing Route-based deployments migrating to direct LoadBalancer:
+
+1. **Update Gateway configuration** to remove hostname restrictions
+2. **Update HTTPRoute and GRPCRoute** to accept any hostname
+3. **Test direct LoadBalancer access** with Host header override
+4. **Update DNS/CDN configuration** to point to LoadBalancer
+5. **Remove OpenShift Route** when cutover is complete
+
+### CDN Integration Benefits
+
+The direct LoadBalancer pattern is specifically optimized for CDN integration:
+
+- **Origin Server Pattern**: Standard CDN → origin configuration
+- **Host Header Flexibility**: CDN can send any custom domain
+- **Certificate Independence**: CDN and origin certificates managed separately
+- **Performance**: Direct connection eliminates unnecessary hops
+
 ---
 
-This architecture provides a solid foundation for enterprise Gateway API adoption with OpenShift Service Mesh 3, supporting secure, scalable, and observable service-to-service communication across clusters.
+This architecture provides a solid foundation for enterprise Gateway API adoption with OpenShift Service Mesh 3, supporting secure, scalable, and observable service-to-service communication across clusters with optimal CDN integration.

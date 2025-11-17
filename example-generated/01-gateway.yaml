@@ -21,11 +21,12 @@ spec:
       kinds:
         - kind: HTTPRoute
 
-  # HTTPS listener for HTTP traffic
+  # Unified HTTPS listener (handles both HTTP and gRPC protocols)
+  # No hostname restriction allows flexible domain configuration
   - name: https
     port: 443
     protocol: HTTPS
-    hostname: demo-gateway-poc.apps.your-cluster.example.com
+    # No hostname field = accepts any hostname (CDN-friendly)
     tls:
       mode: Terminate
       certificateRefs:
@@ -39,22 +40,4 @@ spec:
             app.kubernetes.io/part-of: demo-gateway-poc
       kinds:
         - kind: HTTPRoute
-
-  # gRPC over TLS listener
-  - name: grpc-tls
-    port: 8443
-    protocol: HTTPS
-    hostname: demo-gateway-poc.apps.your-cluster.example.com
-    tls:
-      mode: Terminate
-      certificateRefs:
-      - name: demo-gateway-poc-cert
-        kind: Secret
-    allowedRoutes:
-      namespaces:
-        from: Selector
-        selector:
-          matchLabels:
-            app.kubernetes.io/part-of: demo-gateway-poc
-      kinds:
         - kind: GRPCRoute

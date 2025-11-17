@@ -14,9 +14,8 @@ spec:
     namespace: demo-gateway-poc
     sectionName: https  # Use HTTPS listener
 
-  # Match requests to our hostname
-  hostnames:
-  - demo-gateway-poc.apps.your-cluster.example.com
+  # No hostname restrictions for CDN flexibility
+  # hostnames: []  # Accepts any hostname
 
   rules:
   - matches:
@@ -44,9 +43,8 @@ spec:
     namespace: demo-gateway-poc
     sectionName: http  # Use HTTP listener
 
-  # Match requests to our hostname
-  hostnames:
-  - demo-gateway-poc.apps.your-cluster.example.com
+  # No hostname restrictions for CDN flexibility
+  # hostnames: []  # Accepts any hostname
 
   rules:
   - matches:

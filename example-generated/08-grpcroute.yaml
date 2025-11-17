@@ -8,15 +8,14 @@ metadata:
     app.kubernetes.io/name: grpc-echo-route
     app.kubernetes.io/part-of: demo-gateway-poc
 spec:
-  # Reference the Gateway's gRPC-TLS listener
+  # Reference the Gateway's unified HTTPS listener
   parentRefs:
   - name: demo-e2w-gateway
     namespace: demo-gateway-poc
     sectionName: https  # Use HTTPS listener (port 443) - Gateway can handle both HTTP and gRPC
 
-  # Match requests to our hostname
-  hostnames:
-  - demo-gateway-poc.apps.your-cluster.example.com
+  # No hostname restrictions for CDN flexibility
+  # hostnames: []  # Accepts any hostname
 
   rules:
   # Health check service route

@@ -30,7 +30,7 @@ oc auth can-i '*' '*'
 - ✅ Gateway API CRDs: All present (Gateway, HTTPRoute, GRPCRoute)
 - ✅ Cluster admin access: Confirmed
 
-**Key Discovery**: Found existing test resources from another user (`example-user-*`) in `openshift-ingress` namespace, confirming cert-manager is operational.
+**Key Discovery**: Found existing test resources from other users in `openshift-ingress` namespace, confirming cert-manager is operational.
 
 ### Step 2: Design Decisions and Planning ✅
 **Objective**: Make architectural decisions for POC implementation
@@ -49,7 +49,7 @@ oc auth can-i '*' '*'
 
 3. **Naming Convention**
    - **Decision**: Prefix all resources with `demo-gateway-poc`
-   - **Reasoning**: Clear separation from existing `example-user-*` test resources
+   - **Reasoning**: Clear separation from existing test resources
 
 4. **TLS Strategy**
    - **Decision**: Create dedicated ClusterIssuer with Let's Encrypt
@@ -509,29 +509,31 @@ example-generated/
 For detailed traffic flow diagrams, authentication sequences, and architectural patterns, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 **Key Implementation Features**:
+- Direct LoadBalancer access eliminating OpenShift Route complexity
 - Single Gateway port (443) handling both HTTP and gRPC protocols
-- TLS termination at Gateway edge with Let's Encrypt certificates
+- TLS termination at Gateway edge with automated certificate management
 - JWT authentication with sso.redhat.com integration
 - Layered authorization policies with claims-based validation
 - Cross-namespace routing with proper security isolation
+
+**Architectural Decision**: After testing both Route-based and direct LoadBalancer access patterns, this implementation uses the **direct LoadBalancer approach** for optimal CDN integration and simplified traffic flow.
 
 ### 📁 **Final Manifest Structure**
 
 ```
 example-generated/
 ├── 00-namespace.yaml                    # Gateway namespace
-├── 01-gateway.yaml                      # Unified Gateway (HTTP/gRPC on 443)
+├── 01-gateway.yaml                      # Direct LoadBalancer Gateway (HTTP/gRPC on 443)
 ├── 02-clusterissuer.yaml               # Let's Encrypt ClusterIssuer
 ├── 03-certificate.yaml                 # TLS certificate
-├── 04-route.yaml                       # OpenShift HTTPS Route (passthrough)
-├── 05-echo-services-namespace.yaml     # Services namespace
-├── 06-http-echo-deployment.yaml        # HTTP echo service
-├── 07-grpc-echo-deployment.yaml        # gRPC echo service (busybox)
-├── 08-httproute.yaml                   # HTTPRoute (path-based)
-├── 09-grpcroute.yaml                   # GRPCRoute (protocol-based)
-├── 11-authentication-policy.yaml       # JWT validation (sso.redhat.com)
-├── 12-authorization-policy.yaml        # Global Gateway authorization
-└── 13-http-route-authorization.yaml    # HTTP-specific org_id validation
+├── 04-echo-services-namespace.yaml     # Services namespace
+├── 05-http-echo-deployment.yaml        # HTTP echo service
+├── 06-grpc-echo-deployment.yaml        # gRPC echo service (busybox)
+├── 07-httproute.yaml                   # HTTPRoute (path-based)
+├── 08-grpcroute.yaml                   # GRPCRoute (protocol-based)
+├── 09-authentication-policy.yaml       # JWT validation (sso.redhat.com)
+├── 10-authorization-policy.yaml        # Global Gateway authorization
+└── 11-http-route-authorization.yaml    # HTTP-specific org_id validation
 ```
 
 ### ✅ **Complete Functionality Verification**
@@ -539,7 +541,7 @@ example-generated/
 **Infrastructure**:
 - ✅ OpenShift Service Mesh 3 Gateway API implementation
 - ✅ Let's Encrypt TLS certificate with automatic renewal
-- ✅ OpenShift Route with TLS passthrough for external access
+- ✅ Direct LoadBalancer access for external clients and CDN integration
 - ✅ Cross-namespace service routing (Gateway ↔ echo-services)
 
 **Protocol Support**:
