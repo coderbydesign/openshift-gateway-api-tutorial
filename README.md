@@ -13,6 +13,17 @@ By the end of this tutorial, you'll have a production-ready Gateway API implemen
 - **Cross-namespace Routing** with proper security isolation
 - **Deny-by-default Security** with explicit allow policies
 
+## 🏗️ Architecture Overview
+
+For detailed architectural diagrams, traffic flow explanations, and design patterns, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+
+Key architectural highlights:
+- **Single Gateway port (443)** handling both HTTP and gRPC protocols
+- **TLS termination** at Gateway edge with Let's Encrypt certificates
+- **JWT authentication** with configurable token issuers
+- **Layered authorization** policies with claims-based validation
+- **Cross-namespace routing** with proper security isolation
+
 ## 📋 Prerequisites
 
 ### Environment Requirements
@@ -186,6 +197,7 @@ The interactive tutorial follows this progression:
 
 This repository includes comprehensive reference materials:
 
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Detailed architectural diagrams, traffic flows, and design patterns
 - **[TUTORIAL-LOG.md](TUTORIAL-LOG.md)**: Complete implementation chronicle with troubleshooting details
 - **[TEST-GUIDE.md](TEST-GUIDE.md)**: Comprehensive testing scenarios and examples
 - **[example-generated/](example-generated/)**: Complete example implementation showing tutorial output

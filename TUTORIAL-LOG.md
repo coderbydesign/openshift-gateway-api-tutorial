@@ -504,75 +504,16 @@ example-generated/
 
 ## Final Implementation - Complete POC ✅
 
-### 🏗️ **Traffic Flow Architecture**
+### 🏗️ **Architecture Overview**
 
-```mermaid
-graph TD
-    A[External Client] -->|HTTPS Request| B[OpenShift Route]
-    B -->|TLS Passthrough| C[Gateway:443 HTTPS Listener]
+For detailed traffic flow diagrams, authentication sequences, and architectural patterns, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
-    C --> D{Protocol Detection}
-    D -->|HTTP/1.1| E[HTTPRoute]
-    D -->|HTTP/2 gRPC| F[GRPCRoute]
-
-    E --> G[HTTP Echo Service]
-    F --> H[gRPC Echo Service]
-
-    G --> I[hashicorp/http-echo pods]
-    H --> J[busybox TCP server pods]
-
-    style A fill:#e1f5fe
-    style B fill:#fff3e0
-    style C fill:#f3e5f5
-    style D fill:#e8f5e8
-    style E fill:#fff8e1
-    style F fill:#fff8e1
-    style G fill:#e3f2fd
-    style H fill:#e3f2fd
-```
-
-### 🔐 **Authentication & Authorization Flow**
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Route as OpenShift Route
-    participant GW as Gateway
-    participant Auth as Istio Auth
-    participant HTTP as HTTP Service
-    participant gRPC as gRPC Service
-
-    Client->>Route: HTTPS Request + JWT
-    Route->>GW: TLS Passthrough
-
-    GW->>Auth: JWT Validation
-    Auth->>Auth: Check issuer (sso.redhat.com)
-    Auth->>Auth: Validate signature (JWKS)
-
-    alt Valid JWT
-        Auth->>Auth: Extract claims
-        Auth->>Auth: Check scope contains "api.console"
-
-        alt HTTP Request
-            Auth->>Auth: Check org_id == "12345"
-            alt All checks pass
-                GW->>HTTP: Forward request
-                HTTP-->>Client: Response
-            else Missing org_id
-                Auth-->>Client: 403 RBAC Denied
-            end
-        else gRPC Request
-            alt Scope check passes
-                GW->>gRPC: Forward request
-                gRPC-->>Client: Response
-            else Missing scope
-                Auth-->>Client: 403 RBAC Denied
-            end
-        end
-    else Invalid JWT
-        Auth-->>Client: 403 RBAC Denied
-    end
-```
+**Key Implementation Features**:
+- Single Gateway port (443) handling both HTTP and gRPC protocols
+- TLS termination at Gateway edge with Let's Encrypt certificates
+- JWT authentication with sso.redhat.com integration
+- Layered authorization policies with claims-based validation
+- Cross-namespace routing with proper security isolation
 
 ### 📁 **Final Manifest Structure**
 
