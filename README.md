@@ -51,7 +51,7 @@ oc get pods -n cert-manager
 
 ```bash
 git clone <repository-url>
-cd multi-cluster-poc
+cd openshift-gateway-api-tutorial
 
 # Review the example implementation
 ls -la example-generated/   # Example manifests with 'demo' prefix (shows tutorial output)
